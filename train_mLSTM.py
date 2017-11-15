@@ -6,6 +6,7 @@ import numpy as np
 import argparse
 import random
 import tensorflow as tf
+import pprint
 import time
 import io
 from Utilities import DataLoader
@@ -44,7 +45,8 @@ parser.add_argument('--num_chars', type=int, default=250,
                     help='Option to specify how many chars to sample from the model if --sampling_frequency is not zero ')
 parser.add_argument('--lr_decay', type=int, default=1,
                     help='Switch for learning rate decay. Integer argument of 1 for ON and 0 for OFF, learning rate is decayed to zero over the total number of updates')
-
+parser.add_argument('--np_path', type=str, default=None,
+                    help='Path to directory of numpy weights to restore model from')
 
 args = parser.parse_args()
 
@@ -64,76 +66,133 @@ graph = tf.Graph()
 
 with graph.as_default():
 
-    # weight matrix for character embedding
-    W_embedding = tf.Variable(tf.truncated_normal([vocabulary_size, embedding_size], -0.1, 0.1),name = 'W_embedding')
+    
+    #-----------------------------------------------------------------------------
+    # restore from numpy weights
+    if args.np_path is not None:
+        # read in from the 15 numpy weights files
+        params = [np.load(args.np_path + '/%d.npy'%i) for i in range(15)]
+        wx = np.split(params[1], 4, 1)
+        b = np.split(params[8], 4)
+        gx = np.split(params[9], 4)
+        gm = np.split(params[10], 4)
 
-    # mt = (Wmxxt) ⊙ (Wmhht−1) - equation 18
-    Wmx = tf.Variable(tf.truncated_normal([embedding_size, rnn_size], -0.1, 0.1),name = 'Wmx')
-    Wmh = tf.Variable(tf.truncated_normal([rnn_size, rnn_size], -0.1, 0.1), name = 'Wmh')
+        # Load weights into variables
+        W_embedding = tf.get_variable("W_embedding", initializer=params[0])
 
-    # hˆt = Whxxt + Whmmt
-    Whx = tf.Variable(tf.truncated_normal([embedding_size, rnn_size], -0.1, 0.1),name = 'Whx')
-    Whm = tf.Variable(tf.truncated_normal([rnn_size, rnn_size], -0.1, 0.1),name = 'Whm')
-    Whb = tf.Variable(tf.zeros([1, rnn_size]),name = 'Whb')
+        Wmx = tf.get_variable("Wmx", initializer=params[6])
+        Wmh = tf.get_variable("Wmh", initializer=params[7])
+        
+        Whx = tf.get_variable("Whx", initializer=wx[3])
+        Whm = tf.get_variable("Whm", initializer=params[5])
+        Whb = tf.get_variable("Whb", initializer=np.expand_dims(b[3], axis=0))
 
-    # it = σ(Wixxt + Wimmt)
-    Wix = tf.Variable(tf.truncated_normal([embedding_size, rnn_size], -0.1, 0.1),name = 'Wix')
-    Wim = tf.Variable(tf.truncated_normal([rnn_size, rnn_size], -0.1, 0.1),name = 'Wim')
-    Wib = tf.Variable(tf.zeros([1, rnn_size]),name = 'Wib')
+        Wix = tf.get_variable("Wix", initializer=wx[0])
+        Wim = tf.get_variable("Wim", initializer=params[2])
+        Wib = tf.get_variable("Wib", initializer=np.expand_dims(b[0], axis=0))
 
-    # ot = σ(Woxxt + Wommt)
-    Wox = tf.Variable(tf.truncated_normal([embedding_size, rnn_size], -0.1, 0.1),name = 'Wox')
-    Wom = tf.Variable(tf.truncated_normal([rnn_size, rnn_size], -0.1, 0.1),name = 'Wom')
-    Wob = tf.Variable(tf.zeros([1, rnn_size]),name = 'Wob')
+        Wox = tf.get_variable("Wox", initializer=wx[2])
+        Wom = tf.get_variable("Wom", initializer=params[4])
+        Wob = tf.get_variable("Wob", initializer=np.expand_dims(b[2], axis=0))
 
-    # ft =σ(Wfxxt +Wfmmt)
-    Wfx = tf.Variable(tf.truncated_normal([embedding_size, rnn_size], -0.1, 0.1),name = 'Wfx')# Wox
-    Wfm = tf.Variable(tf.truncated_normal([rnn_size, rnn_size], -0.1, 0.1),name = 'Wfm')# Woh
-    Wfb = tf.Variable(tf.zeros([1, rnn_size]),name = 'Wfb')
+        Wfx = tf.get_variable("Wfx", initializer=wx[1])
+        Wfm = tf.get_variable("Wfm", initializer=params[3])
+        Wfb = tf.get_variable("Wfb", initializer=np.expand_dims(b[1], axis=0))
 
-    # define the g parameters for weight normalization if wn switch is on
-    if args.wn == 1:
+        gmx = tf.get_variable("gmx", initializer=params[11])
+        gmh = tf.get_variable("gmh", initializer=params[12])
 
-        gmx = tf.Variable(tf.truncated_normal([rnn_size], -0.1, 0.1),name='gmx')
-        gmh = tf.Variable(tf.truncated_normal([rnn_size], -0.1, 0.1),name='gmh')
+        ghx = tf.get_variable("ghx", initializer=gx[3])
+        ghm = tf.get_variable("ghm", initializer=gm[3])
 
-        ghx = tf.Variable(tf.truncated_normal([rnn_size], -0.1, 0.1),name='ghx')
-        ghm = tf.Variable(tf.truncated_normal([rnn_size], -0.1, 0.1),name='ghm')
+        gix = tf.get_variable("gix", initializer=gx[0])
+        gim = tf.get_variable("gim", initializer=gm[0])
 
-        gix = tf.Variable(tf.truncated_normal([rnn_size], -0.1, 0.1),name='gix')
-        gim = tf.Variable(tf.truncated_normal([rnn_size], -0.1, 0.1),name='gim')
+        gox = tf.get_variable("gox", initializer=gx[2])
+        gom = tf.get_variable("gom", initializer=gm[2])
 
-        gox = tf.Variable(tf.truncated_normal([rnn_size], -0.1, 0.1),name='gox')
-        gom = tf.Variable(tf.truncated_normal([rnn_size], -0.1, 0.1),name='gom')
+        gfx = tf.get_variable("gfx", initializer=gx[1])
+        gfm = tf.get_variable("gfm", initializer=gm[1])    
 
-        gfx = tf.Variable(tf.truncated_normal([rnn_size], -0.1, 0.1),name='gfx')
-        gfm = tf.Variable(tf.truncated_normal([rnn_size], -0.1, 0.1),name='gfm')
+        Classifier_w = tf.get_variable("Classifier_w", initializer=params[13])
+        Classifier_b = tf.get_variable("Classifier_b", initializer=params[14])      
+
+        pprint.pprint([W_embedding, Wmx, Wmh, Whx, Whm, Whb, Wix, Wim, Wib, Wox, Wom, Wob, 
+                        Wfx, Wfm, Wfb, gmx, gmh, ghx, ghm, gix, gim, gox, gom, gfx, gfm, Classifier_w, Classifier_b] )
+
+        print('Restored from Numpy weights at: ', args.np_path)
+    #-----------------------------------------------------------------------------
+    else:
+        # weight matrix for character embedding
+        W_embedding = tf.Variable(tf.truncated_normal([vocabulary_size, embedding_size], -0.1, 0.1),name = 'W_embedding')
+
+        # mt = (Wmxxt) ⊙ (Wmhht−1) - equation 18
+        Wmx = tf.Variable(tf.truncated_normal([embedding_size, rnn_size], -0.1, 0.1),name = 'Wmx')
+        Wmh = tf.Variable(tf.truncated_normal([rnn_size, rnn_size], -0.1, 0.1), name = 'Wmh')
+
+        # hˆt = Whxxt + Whmmt
+        Whx = tf.Variable(tf.truncated_normal([embedding_size, rnn_size], -0.1, 0.1),name = 'Whx')
+        Whm = tf.Variable(tf.truncated_normal([rnn_size, rnn_size], -0.1, 0.1),name = 'Whm')
+        Whb = tf.Variable(tf.zeros([1, rnn_size]),name = 'Whb')
+
+        # it = σ(Wixxt + Wimmt)
+        Wix = tf.Variable(tf.truncated_normal([embedding_size, rnn_size], -0.1, 0.1),name = 'Wix')
+        Wim = tf.Variable(tf.truncated_normal([rnn_size, rnn_size], -0.1, 0.1),name = 'Wim')
+        Wib = tf.Variable(tf.zeros([1, rnn_size]),name = 'Wib')
+
+        # ot = σ(Woxxt + Wommt)
+        Wox = tf.Variable(tf.truncated_normal([embedding_size, rnn_size], -0.1, 0.1),name = 'Wox')
+        Wom = tf.Variable(tf.truncated_normal([rnn_size, rnn_size], -0.1, 0.1),name = 'Wom')
+        Wob = tf.Variable(tf.zeros([1, rnn_size]),name = 'Wob')
+
+        # ft =σ(Wfxxt +Wfmmt)
+        Wfx = tf.Variable(tf.truncated_normal([embedding_size, rnn_size], -0.1, 0.1),name = 'Wfx')# Wox
+        Wfm = tf.Variable(tf.truncated_normal([rnn_size, rnn_size], -0.1, 0.1),name = 'Wfm')# Woh
+        Wfb = tf.Variable(tf.zeros([1, rnn_size]),name = 'Wfb')
+
+        # define the g parameters for weight normalization if wn switch is on
+        if args.wn == 1:
+
+            gmx = tf.Variable(tf.truncated_normal([rnn_size], -0.1, 0.1),name='gmx')
+            gmh = tf.Variable(tf.truncated_normal([rnn_size], -0.1, 0.1),name='gmh')
+
+            ghx = tf.Variable(tf.truncated_normal([rnn_size], -0.1, 0.1),name='ghx')
+            ghm = tf.Variable(tf.truncated_normal([rnn_size], -0.1, 0.1),name='ghm')
+
+            gix = tf.Variable(tf.truncated_normal([rnn_size], -0.1, 0.1),name='gix')
+            gim = tf.Variable(tf.truncated_normal([rnn_size], -0.1, 0.1),name='gim')
+
+            gox = tf.Variable(tf.truncated_normal([rnn_size], -0.1, 0.1),name='gox')
+            gom = tf.Variable(tf.truncated_normal([rnn_size], -0.1, 0.1),name='gom')
+
+            gfx = tf.Variable(tf.truncated_normal([rnn_size], -0.1, 0.1),name='gfx')
+            gfm = tf.Variable(tf.truncated_normal([rnn_size], -0.1, 0.1),name='gfm')
 
 
-        # normalized weights
-        Wmx = tf.nn.l2_normalize(Wmx, dim=0)*gmx
-        Wmh = tf.nn.l2_normalize(Wmh, dim=0)*gmh
+            # normalized weights
+            Wmx = tf.nn.l2_normalize(Wmx, dim=0)*gmx
+            Wmh = tf.nn.l2_normalize(Wmh, dim=0)*gmh
 
-        Whx = tf.nn.l2_normalize(Whx,dim=0)*ghx
-        Whm = tf.nn.l2_normalize(Whm,dim=0)*ghm
+            Whx = tf.nn.l2_normalize(Whx,dim=0)*ghx
+            Whm = tf.nn.l2_normalize(Whm,dim=0)*ghm
 
-        Wix = tf.nn.l2_normalize(Wix,dim=0)*gix
-        Wim = tf.nn.l2_normalize(Wim,dim=0)*gim
+            Wix = tf.nn.l2_normalize(Wix,dim=0)*gix
+            Wim = tf.nn.l2_normalize(Wim,dim=0)*gim
 
-        Wox = tf.nn.l2_normalize(Wox,dim=0)*gox
-        Wom = tf.nn.l2_normalize(Wom,dim=0)*gom
+            Wox = tf.nn.l2_normalize(Wox,dim=0)*gox
+            Wom = tf.nn.l2_normalize(Wom,dim=0)*gom
 
-        Wfx = tf.nn.l2_normalize(Wfx,dim=0)*gfx
-        Wfm = tf.nn.l2_normalize(Wfm,dim=0)*gfm
+            Wfx = tf.nn.l2_normalize(Wfx,dim=0)*gfx
+            Wfm = tf.nn.l2_normalize(Wfm,dim=0)*gfm
+
+        # Classifier weights and biases.
+        Classifier_w = tf.Variable(tf.truncated_normal([rnn_size, vocabulary_size], -0.1, 0.1),name='Classifier_w')
+        Classifier_b = tf.Variable(tf.zeros([vocabulary_size]),name='Classifier_b')
 
 
     # Variables for saving state across unrolled network.
     saved_output = tf.Variable(tf.zeros([batch_size, rnn_size]),name='saved_output', trainable=False)
     saved_state = tf.Variable(tf.zeros([batch_size, rnn_size]),name='saved_state', trainable=False)
-
-    # Classifier weights and biases.
-    w = tf.Variable(tf.truncated_normal([rnn_size, vocabulary_size], -0.1, 0.1),name='Classifier_w')
-    b = tf.Variable(tf.zeros([vocabulary_size]),name='Classifier_b')
 
     # placeholder for the inputs and the targets
     inputs = tf.placeholder(tf.int32, shape=[batch_size, seq_length],name='inputs')
@@ -166,6 +225,7 @@ with graph.as_default():
         ft = tf.sigmoid(tf.matmul(x,Wfx) + tf.matmul(mt,Wfm)+ Wfb)
 
         c_new = (ft * c) + (it * ht)
+        
 
         h_new = tf.tanh(c_new) * ot
 
@@ -179,10 +239,9 @@ with graph.as_default():
         output, state = mlstm_cell(i, output, state)
         outputs.append(output)
 
-
     with tf.control_dependencies([saved_output.assign(output), saved_state.assign(state)]):
         # Classifier.
-        logits = tf.nn.xw_plus_b(tf.concat(outputs, 0), w, b)
+        logits = tf.nn.xw_plus_b(tf.concat(outputs, 0), Classifier_w, Classifier_b)
         loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=tf.concat(list_labels, 0), logits=logits),name='loss')
         perplexity = tf.exp(loss)
 
@@ -208,13 +267,12 @@ with graph.as_default():
     sample_output, sample_state = mlstm_cell(sample_embedding, saved_sample_output, saved_sample_state)
 
     with tf.control_dependencies([saved_sample_output.assign(sample_output),saved_sample_state.assign(sample_state)]):
-        sample_prediction = tf.nn.softmax(tf.nn.xw_plus_b(sample_output, w, b), name = 'sample_prediction')
+        sample_prediction = tf.nn.softmax(tf.nn.xw_plus_b(sample_output, Classifier_w, Classifier_b), name = 'sample_prediction')
 
 # Summaries for tensorboard
 tf.summary.scalar('train_loss', loss)
 tf.summary.scalar('perplexity', perplexity)
 tf.summary.scalar('learning_rate', learning_rate)
-
 
 with tf.Session(graph=graph) as session:
 
@@ -224,11 +282,11 @@ with tf.Session(graph=graph) as session:
     tf.global_variables_initializer().run()
     print('Variables Initialized')
 
+    # restore from model file
     if args.restore_path is not None:
-
         saver.restore(session, tf.train.latest_checkpoint(args.restore_path))
-        print('Restored')
-
+        print('Restored from model dir: ', args.restore_path)
+    
     summaries = tf.summary.merge_all()
     print('Summaries Merged')
 
