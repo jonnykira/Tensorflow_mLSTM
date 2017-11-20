@@ -77,45 +77,45 @@ with graph.as_default():
         gx = np.split(params[9], 4)
         gm = np.split(params[10], 4)
 
-        # Load weights into variables
-        W_embedding = tf.get_variable("W_embedding", initializer=params[0])
+       # Load weights into variables
+        W_embedding = tf.get_variable("W_embedding", initializer=tf.constant(params[0]))
 
-        Wmx = tf.get_variable("Wmx", initializer=params[6])
-        Wmh = tf.get_variable("Wmh", initializer=params[7])
+        Wmx = tf.get_variable("Wmx", initializer=tf.constant(params[6]))
+        Wmh = tf.get_variable("Wmh", initializer=tf.constant(params[7]))
         
-        Whx = tf.get_variable("Whx", initializer=wx[3])
-        Whm = tf.get_variable("Whm", initializer=params[5])
-        Whb = tf.get_variable("Whb", initializer=np.expand_dims(b[3], axis=0))
+        Whx = tf.get_variable("Whx", initializer=tf.constant(wx[3]))
+        Whm = tf.get_variable("Whm", initializer=tf.constant(params[5]))
+        Whb = tf.get_variable("Whb", initializer=tf.constant(np.expand_dims(b[3], axis=0)))
 
-        Wix = tf.get_variable("Wix", initializer=wx[0])
-        Wim = tf.get_variable("Wim", initializer=params[2])
-        Wib = tf.get_variable("Wib", initializer=np.expand_dims(b[0], axis=0))
+        Wix = tf.get_variable("Wix", initializer=tf.constant(wx[0]))
+        Wim = tf.get_variable("Wim", initializer=tf.constant(params[2]))
+        Wib = tf.get_variable("Wib", initializer=tf.constant(np.expand_dims(b[0], axis=0)))
 
-        Wox = tf.get_variable("Wox", initializer=wx[2])
-        Wom = tf.get_variable("Wom", initializer=params[4])
-        Wob = tf.get_variable("Wob", initializer=np.expand_dims(b[2], axis=0))
+        Wox = tf.get_variable("Wox", initializer=tf.constant(wx[2]))
+        Wom = tf.get_variable("Wom", initializer=tf.constant(params[4]))
+        Wob = tf.get_variable("Wob", initializer=tf.constant(np.expand_dims(b[2], axis=0)))
 
-        Wfx = tf.get_variable("Wfx", initializer=wx[1])
-        Wfm = tf.get_variable("Wfm", initializer=params[3])
-        Wfb = tf.get_variable("Wfb", initializer=np.expand_dims(b[1], axis=0))
+        Wfx = tf.get_variable("Wfx", initializer=tf.constant(wx[1]))
+        Wfm = tf.get_variable("Wfm", initializer=tf.constant(params[3]))
+        Wfb = tf.get_variable("Wfb", initializer=tf.constant(np.expand_dims(b[1], axis=0)))
 
-        gmx = tf.get_variable("gmx", initializer=params[11])
-        gmh = tf.get_variable("gmh", initializer=params[12])
+        gmx = tf.get_variable("gmx", initializer=tf.constant(params[11]))
+        gmh = tf.get_variable("gmh", initializer=tf.constant(params[12]))
 
-        ghx = tf.get_variable("ghx", initializer=gx[3])
-        ghm = tf.get_variable("ghm", initializer=gm[3])
+        ghx = tf.get_variable("ghx", initializer=tf.constant(gx[3]))
+        ghm = tf.get_variable("ghm", initializer=tf.constant(gm[3]))
 
-        gix = tf.get_variable("gix", initializer=gx[0])
-        gim = tf.get_variable("gim", initializer=gm[0])
+        gix = tf.get_variable("gix", initializer=tf.constant(gx[0]))
+        gim = tf.get_variable("gim", initializer=tf.constant(gm[0]))
 
-        gox = tf.get_variable("gox", initializer=gx[2])
-        gom = tf.get_variable("gom", initializer=gm[2])
+        gox = tf.get_variable("gox", initializer=tf.constant(gx[2]))
+        gom = tf.get_variable("gom", initializer=tf.constant(gm[2]))
 
-        gfx = tf.get_variable("gfx", initializer=gx[1])
-        gfm = tf.get_variable("gfm", initializer=gm[1])    
+        gfx = tf.get_variable("gfx", initializer=tf.constant(gx[1]))
+        gfm = tf.get_variable("gfm", initializer=tf.constant(gm[1])) 
 
-        Classifier_w = tf.get_variable("Classifier_w", initializer=params[13])
-        Classifier_b = tf.get_variable("Classifier_b", initializer=params[14])      
+        Classifier_w = tf.get_variable("Classifier_w", initializer=tf.constant(params[13]))
+        Classifier_b = tf.get_variable("Classifier_b", initializer=tf.constant(params[14])) 
 
         pprint.pprint([W_embedding, Wmx, Wmh, Whx, Whm, Whb, Wix, Wim, Wib, Wox, Wom, Wob, 
                         Wfx, Wfm, Wfb, gmx, gmh, ghx, ghm, gix, gim, gox, gom, gfx, gfm, Classifier_w, Classifier_b] )
